@@ -63,11 +63,20 @@ class Client:
             'authorization': 'bearer ' + self._token['access_token']
         }
 
-    async def get_json(self, path, params):
+    async def get_json(self, path, params=None):
         await self.ensure_valid_token()
 
         response = await self._session.get(urljoin(self._api_url, path), params=params, headers=self.get_auth_headers())
         return await response.json()
 
     async def get_events(self, filters=None):
-        return await self.get_json('/v2/events', filters)
+        data = await self.get_json(urljoin(self._api_url, '/v2/events'), filters)
+
+        while True:
+            for resource in data.get('resources', []):
+                yield resource
+
+            if 'next_url' in data:
+                data = await self.get_json(data['next_url'])
+            else:
+                break
